@@ -1,16 +1,21 @@
 use crate::ball::Ball;
 use crate::planet::Planet;
+use crate::drag_drop_fling::Drag_drop_fling;
 use tetra::math::Vec2;
 use tetra::graphics::Color;
 use tetra::time::get_fps;
-use tetra::Context;
+use tetra::{window, Context};
 use tetra::{ContextBuilder, State};
 use tetra::graphics;
-use tetra::input::Key;
+use tetra::input::{Key, MouseButton};
+use tetra::Event;
+use tetra::TetraError;
 
 pub struct GameState {
     pub balls: Vec<Ball>,
     pub planet: Planet,
+    pub drag_drop_fling: Drag_drop_fling,
+    pub mouse_position: Vec2<f32>,
 }
 
 impl State for GameState {
@@ -18,10 +23,6 @@ impl State for GameState {
         for ball in &mut self.balls {
             ball.update(ctx, &self.planet);
         }
-
-        let fps = get_fps(ctx);
-        println!("FPS: {}", fps);
-        
         Ok(())
     }
     
@@ -31,17 +32,53 @@ impl State for GameState {
             ball.draw(ctx);
         }
         self.planet.draw(ctx);
+        self.drag_drop_fling.draw(ctx)?;
+
+        window::set_title(ctx, &format!("Planet Game - {:.0} FPS", get_fps(ctx)));
+
         Ok(())
     }
 
-    fn event(&mut self, ctx: &mut Context, event: tetra::Event) -> Result<(), tetra::TetraError> {
-        if let tetra::Event::KeyReleased { key } = event {
-            if key == Key::S {
-                self.spawn_ball(ctx, Vec2::new(300.0, 300.0), Vec2::new(0.0, 10.0), 5.0, 2.5, Color::rgb(0.2, 0.3, 0.4))?;
-            } else if key == Key::D {
-                self.despawn_ball();
+    #[allow(unused_variables)]
+    fn event(&mut self, ctx: &mut Context, event: Event) -> Result<(), TetraError> {
+        match event {
+            #[allow(unused_variables)]
+            Event::MouseMoved { position, delta } => {
+                self.mouse_position = position;
+                self.drag_drop_fling.current_position = position;
             }
+            Event::MouseButtonReleased { button } => {
+                
+                if button == MouseButton::Left {
+                    let vector_dif = self.drag_drop_fling.end_drag();
+                    let start_pos = self.drag_drop_fling.start_position;
+                    self.spawn_ball(
+                        ctx,
+                        start_pos,
+                        vector_dif,
+                        5.0,2.5,
+                        Color::rgb(0.05, 0.8, 0.4)
+                    )?;
+                }
+            }
+            #[allow(unused_variables)]
+            Event::MouseButtonPressed { button} => {
+                self.drag_drop_fling.start_drag(self.mouse_position)
+            },
+            Event::KeyReleased { key } => {
+                match key {
+                    Key::S => {
+                        println!("Key press")
+                    },
+                    Key::D => {
+                        println!("Key press")
+                    },
+                    _ => {}
+                }
+            },
+            _ => {}
         }
+    
         Ok(())
     }
 }
@@ -51,6 +88,7 @@ impl GameState {
         ContextBuilder::new("Planet Game", 1280, 720)
             .show_mouse(true)
             .resizable(true)
+            .multisampling(8)
             .build()?
             .run(Self::new)
     }
@@ -68,7 +106,12 @@ impl GameState {
 
         balls.push(second_ball);
 
-        Ok(GameState { balls, planet })
+        Ok(GameState {
+            balls: balls,
+            planet: planet,
+            drag_drop_fling: Drag_drop_fling::new(),
+            mouse_position: Vec2::new(0.0, 0.00),
+        })
     }
 
     pub fn spawn_ball(&mut self, ctx: &mut Context, position: Vec2<f32>, velocity: Vec2<f32>, radius: f32, mass: f32, color: Color) -> tetra::Result<()> {
@@ -77,7 +120,7 @@ impl GameState {
         Ok(())
     }
 
-    pub fn despawn_ball(&mut self) -> tetra::Result<()> {
+    pub fn despawn_last_ball(&mut self) -> tetra::Result<()> {
         self.balls.pop();
         Ok(())
     }
