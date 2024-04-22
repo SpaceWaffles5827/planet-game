@@ -2,24 +2,45 @@ use crate::ball::Ball;
 use crate::planet::Planet;
 use crate::drag_drop_fling::Drag_drop_fling;
 use tetra::math::Vec2;
-use tetra::graphics::Color;
+use tetra::graphics::{Color, Texture, Camera};
 use tetra::time::get_fps;
-use tetra::{window, Context};
+use tetra::{input, window, Context};
 use tetra::{ContextBuilder, State};
 use tetra::graphics;
 use tetra::input::{Key, MouseButton};
 use tetra::Event;
 use tetra::TetraError;
 
+
+struct Npc {
+    texture: Texture,
+    position: Vec2<f32>,
+}
+
+impl Npc {
+    fn new(ctx: &mut Context) -> tetra::Result<Npc> {
+        let texture = Texture::new(ctx, "./src/resources/spaceMan.png")?;
+        Ok(Npc{texture, position: Vec2::new(100.0, 100.0)})
+    }
+
+    pub fn draw(&self, ctx: &mut Context) -> tetra::Result<()> {
+        self.texture.draw(ctx, self.position);
+        Ok(())
+    }
+}
+
 pub struct GameState {
     pub balls: Vec<Ball>,
     pub planet: Planet,
     pub drag_drop_fling: Drag_drop_fling,
-    pub mouse_position: Vec2<f32>,
+    pub npc: Npc,
+    pub is_right_click: bool,
+    pub camera: Camera,
 }
 
 impl State for GameState {
     fn update(&mut self, ctx: &mut Context) -> tetra::Result {
+        graphics::set_transform_matrix(ctx, self.camera.as_matrix());
         for ball in &mut self.balls {
             ball.update(ctx, &self.planet);
         }
@@ -33,6 +54,7 @@ impl State for GameState {
         }
         self.planet.draw(ctx);
         self.drag_drop_fling.draw(ctx)?;
+        self.npc.draw(ctx)?;
 
         window::set_title(ctx, &format!("Planet Game - {:.0} FPS", get_fps(ctx)));
 
@@ -42,13 +64,16 @@ impl State for GameState {
     #[allow(unused_variables)]
     fn event(&mut self, ctx: &mut Context, event: Event) -> Result<(), TetraError> {
         match event {
-            #[allow(unused_variables)]
             Event::MouseMoved { position, delta } => {
-                self.mouse_position = position;
-                self.drag_drop_fling.current_position = position;
+                self.drag_drop_fling.current_position = input::get_mouse_position(ctx) + self.camera.position;
+                println!("{}", delta);
+                if self.is_right_click {
+                    self.camera.position -= delta;
+                    self.camera.update();
+                }
             }
+
             Event::MouseButtonReleased { button } => {
-                
                 if button == MouseButton::Left {
                     let vector_dif = self.drag_drop_fling.end_drag();
                     let start_pos = self.drag_drop_fling.start_position;
@@ -59,19 +84,37 @@ impl State for GameState {
                         5.0,2.5,
                         Color::rgb(0.05, 0.8, 0.4)
                     )?;
+                } else if button == input::MouseButton::Right {
+                    self.is_right_click = false;
                 }
             }
+
             #[allow(unused_variables)]
             Event::MouseButtonPressed { button} => {
-                self.drag_drop_fling.start_drag(self.mouse_position)
+                if button == input::MouseButton::Left {
+                    self.drag_drop_fling.start_drag(input::get_mouse_position(ctx) + self.camera.position)
+                } else if button == input::MouseButton::Right {
+                    self.is_right_click = true
+                }
             },
+
             Event::KeyReleased { key } => {
                 match key {
+                    Key::W => {
+                        self.camera.position.y -= 20.0;
+                        self.camera.update();
+                    }
+                    Key::A => {
+                        self.camera.position.x -= 20.0;
+                        self.camera.update();
+                    }
                     Key::S => {
-                        println!("Key press")
+                        self.camera.position.y += 20.0;
+                        self.camera.update();
                     },
                     Key::D => {
-                        println!("Key press")
+                        self.camera.position.x += 20.0;
+                        self.camera.update();
                     },
                     _ => {}
                 }
@@ -110,7 +153,9 @@ impl GameState {
             balls: balls,
             planet: planet,
             drag_drop_fling: Drag_drop_fling::new(),
-            mouse_position: Vec2::new(0.0, 0.00),
+            npc: Npc::new(ctx)?,
+            camera: Camera::new(0.0, 0.0),
+            is_right_click: false,
         })
     }
 
