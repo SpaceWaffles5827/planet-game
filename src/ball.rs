@@ -31,6 +31,7 @@ fn get_force_of_gravity(object1: &Ball, object2: &Planet) -> Vec2<f32> {
 }
 
 pub struct Ball {
+    pub is_visable: bool,
     pub mass: f32,
     pub mesh: Mesh,
     pub position: Vec2<f32>,
@@ -44,6 +45,7 @@ impl Ball {
     pub fn new(ctx: &mut Context, position: Vec2<f32>, velocity: Vec2<f32>, radius: f32, mass: f32, color: Color) -> tetra::Result<Ball> {
         let mesh = Mesh::circle(ctx, ShapeStyle::Fill, Vec2::zero(), radius)?;
         Ok(Ball {
+            is_visable: true,
             mesh,
             position,
             velocity,
@@ -74,6 +76,9 @@ impl Ball {
 
         // Check for collision
         if distance <= self.radius + planet.radius {
+
+            self.is_visable = false;
+
             // Reflect velocity
             let normal_velocity = self.velocity.dot(normal_vector);
             self.velocity -= 2.0 * normal_velocity * normal_vector;
@@ -87,7 +92,9 @@ impl Ball {
 
 
     pub fn draw(&self, ctx: &mut Context) {
-        self.trail.draw(ctx);  // Draw the trail before the ball
-        self.mesh.draw(ctx, self.position);
+        if self.is_visable {
+            self.trail.draw(ctx);
+            self.mesh.draw(ctx, self.position);
+        }
     }
 }
