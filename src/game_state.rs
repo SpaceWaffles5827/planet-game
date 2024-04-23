@@ -38,7 +38,7 @@ impl Npc {
             orbit_radius,
             current_angle: initial_angle,
             target_angle: target_angle,
-            angular_velocity: 0.01,  // This can be adjusted for speed
+            angular_velocity: 0.001,  // This can be adjusted for speed
         })
     }
 
@@ -216,13 +216,17 @@ impl GameState {
         let planet: Planet = Planet::new(ctx, Vec2::new(0.0, 0.0),
             1000.0, 10000000000.0, Color::rgb(0.05, 0.8, 0.4))?;
 
-        let npc = Npc::new(ctx, planet.position, 1000.0)?; // Radius of 300, adjust as needed
+        let mut npcs = Vec::new();
+        for _ in 0..10 {  // Generate 10 NPCs
+            let npc = Npc::new(ctx, planet.position, 1000.0)?;
+            npcs.push(npc);
+        }
 
         Ok(GameState {
             balls: vec![ball],
             planet: planet,
             drag_drop_fling: Drag_drop_fling::new(),
-            npcs: vec!(npc),
+            npcs: npcs,
             camera: Camera::new(1280.0, 720.0),
             is_right_click: false,
         })
