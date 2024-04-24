@@ -1,8 +1,9 @@
 use crate::ball::Ball;
 use crate::planet::Planet;
 use crate::drag_drop_fling::Drag_drop_fling;
+use crate::npc::Npc;
 use tetra::math::Vec2;
-use tetra::graphics::{Color, Texture, Camera, DrawParams};
+use tetra::graphics::{Color, Camera, Shader};
 use tetra::time::get_fps;
 use tetra::{input, window, Context};
 use tetra::{ContextBuilder, State};
@@ -10,79 +11,6 @@ use tetra::graphics;
 use tetra::input::{Key, MouseButton};
 use tetra::Event;
 use tetra::TetraError;
-use rand::Rng;
-use std::f32::consts::PI;
-
-struct Npc {
-    texture: Texture,
-    position: Vec2<f32>,
-    rotation: f32,
-    orbit_center: Vec2<f32>,
-    orbit_radius: f32,
-    current_angle: f32,
-    target_angle: f32,
-    angular_velocity: f32,
-}
-
-impl Npc {
-    fn new(ctx: &mut Context, planet_center: Vec2<f32>, orbit_radius: f32) -> tetra::Result<Npc> {
-        let texture = Texture::new(ctx, "./src/resources/spaceMan.png")?;
-        let initial_angle = rand::thread_rng().gen_range(0.0..2.0 * PI);
-        let target_angle = rand::thread_rng().gen_range(0.0..2.0 * PI);
-
-        Ok(Npc {
-            texture,
-            position: Npc::calculate_position(planet_center, orbit_radius, initial_angle),
-            rotation: 0.0,
-            orbit_center: planet_center,
-            orbit_radius,
-            current_angle: initial_angle,
-            target_angle: target_angle,
-            angular_velocity: 0.001,  // This can be adjusted for speed
-        })
-    }
-
-    fn calculate_position(orbit_center: Vec2<f32>, orbit_radius: f32, angle: f32) -> Vec2<f32> {
-        Vec2::new(
-            orbit_center.x + orbit_radius * angle.cos(),
-            orbit_center.y + orbit_radius * angle.sin()
-        )
-    }
-
-    fn update_target_angle(&mut self) {
-        self.target_angle = rand::thread_rng().gen_range(0.0..2.0 * PI);
-    }
-
-    pub fn update(&mut self) {
-        let angle_difference = (self.target_angle - self.current_angle + 2.0 * PI) % (2.0 * PI);
-
-        if angle_difference > 0.0 && angle_difference < self.angular_velocity {
-            self.current_angle = self.target_angle;  // Snap to the target angle if very close
-            self.update_target_angle();  // Select a new target angle once reached
-        } else {
-            if angle_difference > PI {  // If more than 180 degrees away, decrease angle
-                self.current_angle -= self.angular_velocity;
-            } else {  // If less than 180 degrees away, increase angle
-                self.current_angle += self.angular_velocity;
-            }
-        }
-
-        self.current_angle = (self.current_angle + 2.0 * PI) % (2.0 * PI);  // Normalize angle
-        self.position = Npc::calculate_position(self.orbit_center, self.orbit_radius, self.current_angle);
-        self.rotation = self.current_angle + PI / 2.0;
-    }
-
-    pub fn draw(&self, ctx: &mut Context, draw_params: tetra::graphics::DrawParams) -> tetra::Result<()> {
-        self.texture.draw_region(
-            ctx,
-            tetra::graphics::Rectangle::new(0.0, 0.0, self.texture.width() as f32, self.texture.height() as f32),
-            draw_params.position(self.position)
-                .origin(Vec2::new(self.texture.width() as f32 / 2.0, self.texture.height() as f32))
-                .rotation(self.rotation)
-        );
-        Ok(())
-    }
-}
 
 pub struct GameState {
     pub balls: Vec<Ball>,
@@ -91,6 +19,7 @@ pub struct GameState {
     pub npcs: Vec<Npc>,
     pub is_right_click: bool,
     pub camera: Camera,
+    shader: Shader,
 }
 
 impl State for GameState {
@@ -99,6 +28,7 @@ impl State for GameState {
         for ball in &mut self.balls {
             ball.update(ctx, &self.planet);
         }
+
         for npc in &mut self.npcs {
             npc.update(); // Update each NPC's position
         }
@@ -110,15 +40,19 @@ impl State for GameState {
         for ball in &self.balls {
             ball.draw(ctx);
         }
+
+        graphics::set_shader(ctx, &self.shader);
         self.planet.draw(ctx);
+        graphics::reset_shader(ctx);
+
         self.drag_drop_fling.draw(ctx)?;
     
         // Create DrawParams object inside the loop
-        for npc in &self.npcs {
-            let draw_params = DrawParams::new();  // Recreate for each NPC
-            npc.draw(ctx, draw_params)?;
-        }
-    
+        // for npc in &self.npcs {
+        //     let draw_params = DrawParams::new();  // Recreate for each NPC
+        //     npc.draw(ctx, draw_params)?;
+        // }
+
         window::set_title(ctx, &format!("Planet Game - {:.0} FPS", get_fps(ctx)));
     
         Ok(())
@@ -214,13 +148,15 @@ impl GameState {
         let ball = Ball::new(ctx,  Vec2::new(-200.0, -200.0),
             Vec2::new(50.0, 0.0), 5.0, 2.5, Color::rgb(0.05, 0.8, 0.4))?;
         let planet: Planet = Planet::new(ctx, Vec2::new(0.0, 0.0),
-            1000.0, 10000000000.0, Color::rgb(0.05, 0.8, 0.4))?;
+            250.0, 10000000000.0, Color::rgb(1.0, 1.0, 1.0))?;
 
         let mut npcs = Vec::new();
         for _ in 0..10 {  // Generate 10 NPCs
-            let npc = Npc::new(ctx, planet.position, 1000.0)?;
+            let npc = Npc::new(ctx, planet.position, 250.0)?;
             npcs.push(npc);
         }
+
+        let shader = Shader::from_fragment_file(ctx, "./src/resources/fragment_shader.glsl")?;
 
         Ok(GameState {
             balls: vec![ball],
@@ -229,6 +165,7 @@ impl GameState {
             npcs: npcs,
             camera: Camera::new(1280.0, 720.0),
             is_right_click: false,
+            shader: shader,
         })
     }
 
