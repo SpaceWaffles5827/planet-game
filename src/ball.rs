@@ -75,7 +75,7 @@ impl Ball {
         let normal_vector = Vec2::new(dx / distance, dy / distance); // Normalized direction vector from ball to planet
 
         // Check for collision
-        if distance <= self.radius + planet.radius {
+        if distance <= self.radius + planet.radious {
 
             self.is_visable = false;
 
@@ -84,7 +84,7 @@ impl Ball {
             self.velocity -= 2.0 * normal_velocity * normal_vector;
 
             // Correct position if ball is inside the planet
-            let overlap = (self.radius + planet.radius) - distance;
+            let overlap = (self.radius + planet.radious) - distance;
             self.position -= normal_vector * overlap;
         }
         self.trail.push(self.position);

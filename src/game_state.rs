@@ -3,7 +3,7 @@ use crate::planet::Planet;
 use crate::drag_drop_fling::Drag_drop_fling;
 use crate::npc::Npc;
 use tetra::math::Vec2;
-use tetra::graphics::{Color, Camera, Shader};
+use tetra::graphics::{Color, Camera, Shader, DrawParams};
 use tetra::time::get_fps;
 use tetra::{input, window, Context};
 use tetra::{ContextBuilder, State};
@@ -46,12 +46,13 @@ impl State for GameState {
         graphics::reset_shader(ctx);
 
         self.drag_drop_fling.draw(ctx)?;
+        graphics::set_shader(ctx, &self.shader);
     
-        // Create DrawParams object inside the loop
-        // for npc in &self.npcs {
-        //     let draw_params = DrawParams::new();  // Recreate for each NPC
-        //     npc.draw(ctx, draw_params)?;
-        // }
+        for npc in &self.npcs {
+            let draw_params = DrawParams::new();  // Recreate for each NPC
+            npc.draw(ctx, draw_params)?;
+        }
+        graphics::reset_shader(ctx);
 
         window::set_title(ctx, &format!("Planet Game - {:.0} FPS", get_fps(ctx)));
     
@@ -156,7 +157,14 @@ impl GameState {
             npcs.push(npc);
         }
 
-        let shader = Shader::from_fragment_file(ctx, "./src/resources/fragment_shader.glsl")?;
+        
+        let shader = Shader::new(
+            ctx,
+            "./src/vertex_shader.glsl",
+            "./src/fragment_shader.glsl",
+        )?;
+
+        // let shader = Shader::from_fragment_file(ctx, "./src/fragment_shader.glsl")?;
 
         Ok(GameState {
             balls: vec![ball],
